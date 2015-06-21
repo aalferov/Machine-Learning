@@ -71,3 +71,9 @@ confusionMatrix(predictionDT, validation$classe)
 
 #Train second model via Random Forest algorythm
 modelRF <- randomForest(classe ~. , data = training, method = "class")
+
+#Make a prediction
+predictionRF <- predict(modelRF, validation, type = "class")
+
+#Check the result of prediction
+confusionMatrix(predictionRF, validation$classe)
