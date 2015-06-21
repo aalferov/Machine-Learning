@@ -1,0 +1,158 @@
+---
+title: "Prediction Assignment"
+author: "Andrey Alferov"
+date: "Sunday, June 21, 2015"
+output: html_document
+---
+
+##Introduction
+
+###Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project,  data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants is used. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set.
+
+###Data 
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+
+##Getting and cleaning data
+Load required libraries
+```{r, warning=FALSE, message=FALSE}
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+```
+
+Download csv files with training and testing data and load them into dataframes. Remove empty and redundant values while loading.
+```{r, warning=FALSE, message=FALSE}
+setwd("D:/Coursera/Data Science/Machine-Learning")
+
+#Load testing dataset
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+fileName <- "pml-training.csv"
+
+if(!file.exists(fileName))
+{  
+  download.file(fileUrl, fileName)
+}
+
+trainingDS <- read.csv(fileName, na.strings=c("NA","#DIV/0!", ""))
+
+#Load training dataset
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+fileName <- "pml-testing.csv"
+
+if(!file.exists(fileName))
+{  
+  download.file(fileUrl, fileName)
+}
+
+testingDS <- read.csv(fileName, na.strings=c("NA","#DIV/0!", ""))
+```
+
+Let's examine our training dataset
+```{r}
+dim(trainingDS) 
+dim(testingDS)
+```
+So we have 19622 observations of 160 variables in training dataset and 20 observations of 20 variables in testing dataset.
+
+```{r}
+summary(trainingDS)
+```
+
+Variables "user_name", "X", "raw_timestamp_part_1", "raw_timestamp_part_2" and "cvtd_timestamp" are descriptive ones, so they don't have any sense for prediction. Let's remove them from training and testing datasets.
+```{r}
+trainingDS <- subset(trainingDS, select = -c(user_name, X, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp))
+testingDS <- subset(testingDS, select = -c(user_name, X, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp))
+```
+
+There a number of variables with a lot of NA's values. Let's remove them too.
+```{r}
+trainingDS <-trainingDS[ ,colSums(is.na(trainingDS)) == 0]
+testingDS <-testingDS[ ,colSums(is.na(testingDS)) == 0]
+```
+
+Now our training data looks much tidier.
+```{r}
+str(trainingDS)
+```
+
+## Feature selection
+Exclude predictors with near zero variance as they doesn't affect prediction result
+```{r}
+nzvCol <- nearZeroVar(trainingDS)
+trainingDS <- trainingDS[ ,-nzvCol]
+```
+
+## Partitioning the training set
+Let's separate our training data into a training set and a validation set so that we can validate our model. This will be performed by using random subsampling without replacement.
+```{r}
+set.seed(210615)
+trainset <- createDataPartition(trainingDS$classe, p = 0.8, list = FALSE)
+training <- trainingDS[trainset, ]
+validation <- trainingDS[-trainset, ]
+```
+
+## Model train and validation
+Let's train our model by using two algorythms widely used for classification tasks: Decision Tree and Random Forest. We will compare their quality by accuracy metric. The expected out-of-sample error will correspond to the quantity: 1-accuracy in the cross-validation data.
+
+### Decision Trees
+Train first model via Decision Trees algorithm.
+```{r}
+modelDT <- rpart(classe ~ ., data = training, method = "class")
+```
+
+Make a prediction using the model on validation set.
+```{r}
+predictionDT <- predict(modelDT, validation, type = "class")
+```
+
+Plot the decision tree.
+```{r}
+rpart.plot(modelDT, main = "Classification Tree", extra = 102, under = TRUE, faclen = 0)
+```
+
+Check the result of prediction by building the Confusion Matrix.
+```{r}
+confusionMatrix(predictionDT, validation$classe)
+```
+
+Confusion Matrix shows that the Decision Trees model predicts with 74% accuracy (only 74% of predicted values of "classe" variable fit the actual values in validation set) with 95% confidence interval equal to (0.7286, 0.7562).
+
+
+### Random Forest
+Train first model via Random Forest algorithm.
+```{r}
+modelRF <- randomForest(classe ~. , data = training, method = "class")
+```
+
+Make a prediction.
+```{r}
+predictionRF <- predict(modelRF, validation, type = "class")
+```
+
+Check the result of prediction.
+```{r}
+confusionMatrix(predictionRF, validation$classe)
+```
+
+Confusion Matrix shows that the Random Forest model predicts with 99% accuracy (99% of predicted values of "classe" variable fit the actual values in validation set) with 95% confidence interval equal to (0.996, 0.9991).
+
+##Conclusion
+Random Forest algorithm shows better quality of prediction than Decision Trees.
+The random Forest model is choosen. The accuracy of the model is 0.998. The expected out-of-sample error is estimated at 0.002, or 0.2%. The expected out-of-sample error is calculated as 1 - accuracy for predictions made against the cross-validation set. So, we can expect that almost all of the test samples will be classified correctly.
+
+
+

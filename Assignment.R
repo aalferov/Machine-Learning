@@ -50,6 +50,7 @@ str(trainingDS)
 #Exclude predictors with near zero variance as they doesn't affect prediction result
 nzvCol <- nearZeroVar(trainingDS)
 trainingDS <- trainingDS[ ,-nzvCol]
+testingDS <- testingDS[ ,-nzvCol]
 
 #Create data partitions
 set.seed(210615)
@@ -77,3 +78,4 @@ predictionRF <- predict(modelRF, validation, type = "class")
 
 #Check the result of prediction
 confusionMatrix(predictionRF, validation$classe)
+
